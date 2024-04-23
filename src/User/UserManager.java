@@ -25,8 +25,11 @@ public class UserManager {
             // Read lines from the file until no more are left
             while ((line = bufferedReader.readLine()) != null) {
                 String[] user = line.split(" ");
-                User newUser = new User(user[0], user[1]);
-                userDataBase.put(user[0], user[1]);
+                String username = user[0];
+                String pass = user[1];
+                User newUser = new User(username,pass);
+                userList.add(newUser);
+                userDataBase.put(username, pass);
             }
 
             // Close the BufferedReader and FileReader

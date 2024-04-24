@@ -8,15 +8,19 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import network.Client;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -24,16 +28,18 @@ import java.io.IOException;
 
 public class GUI extends Application {
     private Stage primaryStage;
-    public UserManager manager;
-    public Library library;
     private ObservableList<Book> books = FXCollections.observableArrayList();
+    private ObservableList<Book> borrowedBooks = FXCollections.observableArrayList();
+
     private TableView<Book> tableView = new TableView<>();
+    private Client client;
 
     public GUI() {
+        client = new Client("127.0.0.1", 2000);
         // Initialize your UserManager or handle it differently
-        this.manager = new UserManager();
-        this.library = new Library();
+
     }
+
 
     @Override
     public void start(Stage primaryStage) {
@@ -97,13 +103,18 @@ public class GUI extends Application {
         grid.add(message, 1, 6);
 
         btnLogin.setOnAction(e -> {
-            String username = userTextField.getText();
-            String password = pwBox.getText();
-            if (manager.isValidLogin(username, password)) {  // Assuming UserManager has this method
-                message.setText("Login Successful. Welcome " + username);
-                Platform.runLater(this::mainStage);
-            } else {
+            if(userTextField.getText().equals("")|| pwBox.getText().equals("")){
                 message.setText("Login Failed. Try again.");
+            }else {
+                String login = userTextField.getText() + " " + pwBox.getText();
+
+
+                if (client.vaildLogin(login)) {  // Assuming UserManager has this method
+                    message.setText("Login Successful. Welcome " + userTextField.getText());
+                    Platform.runLater(this::mainStage);
+                } else {
+                    message.setText("Login Failed. Try again.");
+                }
             }
         });
 
@@ -146,16 +157,21 @@ public class GUI extends Application {
         grid.add(message, 1, 6);
 
         btnCreate.setOnAction(e -> {
-            if(manager.contains(userTextField.getText())){
-                message.setText("Username is already taken. Please choose another.");
-            }else if(pwBox.getText().equals(pwBox1.getText())){
-                User user = new User(userTextField.getText(), pwBox.getText());
-                manager.addUser(user);
-                Platform.runLater(this::mainStage);
-            }else{
-                message.setText("Passwords Do Not Match.");
-            }
+            if(userTextField.getText().equals("")|| pwBox.getText().equals("")|| pwBox1.getText().equals("")){
+                message.setText("Please Make Sure You Fill In All of the Boxes");
+            }else {
 
+                if (pwBox.getText().equals(pwBox1.getText())) {
+                    if (client.newUser(userTextField.getText() + " " + pwBox.getText())) {
+                        Platform.runLater(this::mainStage);
+                    } else {
+                        message.setText("User Already Exists");
+                    }
+
+                } else {
+                    message.setText("Passwords Do Not Match.");
+                }
+            }
         });
 
         Scene scene = new Scene(grid, 300, 275);
@@ -164,7 +180,8 @@ public class GUI extends Application {
     }
 
     public void mainStage() {
-        for(Book b:library.library){
+        Library library = client.getLibrary();
+        for(Book b: library.library){
             books.add(b);
         }
 
@@ -212,10 +229,24 @@ public class GUI extends Application {
         searchButton.setOnAction(e -> searchBooks(searchField.getText()));
 
         Button logoutButton = new Button("Logout");
-        logoutButton.setOnAction(e -> primaryStage.close()); // Simple logout action
+        logoutButton.setOnAction(e -> Platform.runLater(this::showLoginScreen)); // Simple logout action
 
         Button exitButton = new Button("Exit");
-        exitButton.setOnAction(e -> Platform.exit());
+        exitButton.setOnAction(e -> {
+            client.close();
+            Platform.exit();}
+                );
+
+        tableView.setRowFactory(tv -> {
+            TableRow<Book> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (!row.isEmpty() && event.getClickCount() == 1) {
+                    Book clickedBook = row.getItem();
+                    showBookDescription(clickedBook);
+                }
+            });
+            return row;
+        });
 
         GridPane searchPane = new GridPane();
         searchPane.setHgap(10);
@@ -247,6 +278,33 @@ public class GUI extends Application {
             }
         }
         tableView.setItems(filtered);
+    }
+
+    private void showBookDescription(Book book) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Book Details");
+        alert.setHeaderText(book.getTitle());
+        alert.setContentText("Author: " + book.getAuthor() + "\nGenre: " + book.getGenre());
+
+        if (book.getImage() != null) {
+            Image fxImage = SwingFXUtils.toFXImage(book.getImage(), null);
+            ImageView imageView = new ImageView(fxImage);
+            imageView.setFitWidth(200);
+            imageView.setPreserveRatio(true);
+            alert.setGraphic(imageView);
+        }
+
+        alert.showAndWait();
+    }
+
+    private void handleBorrow(Book book) {
+        if (book.borrow()) {
+            tableView.refresh();
+            borrowedBooks.add(book);
+        } else {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION, "No more copies available.");
+            alert.showAndWait();
+        }
     }
 
     public static void main(String[] args) {

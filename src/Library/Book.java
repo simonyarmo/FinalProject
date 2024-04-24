@@ -1,17 +1,23 @@
 package Library;
 
-public class Book {
+import java.awt.image.BufferedImage;
+import java.io.Serializable;
+
+public class Book implements Serializable {
     private String title;
     private String author;
     private String genre;
 
+    private BufferedImage image;
+
     public int number;
 
-    public Book(String title, String author, String genre, int number) {
+    public Book(String title, String author, String genre, int number, BufferedImage image) {
         this.title = title;
         this.author = author;
         this.genre = genre;
         this.number =number;
+        this.image = image;
     }
 
     public String getTitle() {
@@ -51,4 +57,8 @@ public class Book {
         }
         else{return false;}
     }
+    public BufferedImage getImage(){
+        return image;
+    }
+
 }

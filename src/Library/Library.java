@@ -1,16 +1,15 @@
 package Library;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
-import java.lang.reflect.Array;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.*;
 import java.util.ArrayList;
 
-public class Library {
+public class Library implements Serializable {
     public ArrayList<Book> library;
     public Library(){
         library=new ArrayList<>();
-        createLibrary();
+
     }
 
     public void createLibrary(){
@@ -27,7 +26,8 @@ public class Library {
                 for(int i =0; i<user.length;i++){
                     user[i] = user[i].replaceAll("\"", "");
                 }
-                Book newBook = new Book(user[0], user[1], user[2], Integer.parseInt(user[3]));
+                BufferedImage img = loadImage(user[4]);
+                Book newBook = new Book(user[0], user[1], user[2], Integer.parseInt(user[3]),img);
                 library.add(newBook);
             }
 
@@ -38,5 +38,14 @@ public class Library {
         }
 
 
+    }
+    private BufferedImage loadImage(String path) {
+        try {
+            // Adjust this if images are stored outside the JAR; use FileInputStream if necessary
+            return ImageIO.read(new File(path));
+        } catch (IOException e) {
+            System.out.println("Error loading image: " + e.getMessage());
+            return null;
+        }
     }
 }

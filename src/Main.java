@@ -3,6 +3,7 @@ import Library.Library;
 import User.User;
 import User.UserManager;
 import javafx.application.Application;
+import network.Client;
 
 import java.io.BufferedReader;
 import java.io.FileReader;

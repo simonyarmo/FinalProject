@@ -15,6 +15,13 @@ public class UserManager {
     public UserManager(){
         userDataBase = new HashMap<>();
         userList=new ArrayList<>();
+
+    }
+
+    public Map data(){
+        return userDataBase;
+    }
+    public void createUsers(){
         try {
             // Create a FileReader
             FileReader fileReader = new FileReader("src/User/Users");
@@ -37,10 +44,6 @@ public class UserManager {
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    public Map data(){
-        return userDataBase;
     }
     public boolean isValidLogin(String user, String pass){
         if(userDataBase.containsKey(user)){

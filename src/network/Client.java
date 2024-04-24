@@ -1,69 +1,114 @@
-package network;// A Java program for a Client
+package network;
+import Library.Library;
+
 import java.io.*;
 import java.net.*;
 import java.util.Scanner;
 
 public class Client {
-    // initialize socket and input output streams
     private Socket socket = null;
-    private DataInputStream input = null;
+    private DataInputStream serverInput = null;
     private DataOutputStream out = null;
+    private Scanner scanner = null;
+    private ObjectInputStream objectIn;
 
-    // constructor to put ip address and port
-    public Client(String address, int port)
-    {
-        // establish a connection
+    public Client(String address, int port) {
         try {
             socket = new Socket(address, port);
             System.out.println("Connected");
 
-            // takes input from terminal
-            input = new DataInputStream(System.in);
-
-            // sends output to the socket
-            out = new DataOutputStream(
-                    socket.getOutputStream());
-        }
-        catch (UnknownHostException u) {
+            scanner = new Scanner(System.in);
+            serverInput = new DataInputStream(socket.getInputStream());
+            out = new DataOutputStream(socket.getOutputStream());
+            objectIn = new ObjectInputStream(socket.getInputStream());
+        } catch (UnknownHostException u) {
             System.out.println(u);
-            return;
-        }
-        catch (IOException i) {
+
+        } catch (IOException i) {
             System.out.println(i);
-            return;
+
         }
 
-        // string to read message from input
-        String line = "";
+//        String line = "";
+//        while (!line.equals("Over")) {
+//            try {
+//                line = scanner.nextLine();
+//                out.writeUTF(line);
+//                out.flush();
+//                Boolean response = serverInput.readBoolean();
+//                System.out.println(response);
+//            } catch (IOException i) {
+//                System.out.println(i);
+//                break;
+//            }
+//        }
+//
+//        try {
+//            scanner.close();
+//            serverInput.close();
+//            out.close();
+//            socket.close();
+//        } catch (IOException i) {
+//            System.out.println(i);
+//        }
+    }
+    public boolean vaildLogin(String user){
+        Boolean response =false;
+        user = "login "+user;
 
-        // keep reading until "Over" is input
-        while (!line.equals("Over")) {
             try {
-                line = input.readLine();
-                out.writeUTF(line);
-            }
-            catch (IOException i) {
+                out.writeUTF(user);
+                out.flush();
+                 response = serverInput.readBoolean();
+            } catch (IOException i) {
                 System.out.println(i);
             }
+
+
+        return response;
+    }
+    public boolean newUser(String create){
+        Boolean response =false;
+        create = "create "+create;
+
+        try {
+            out.writeUTF(create);
+            out.flush();
+            response = serverInput.readBoolean();
+        } catch (IOException i) {
+            System.out.println(i);
         }
 
-        // close the connection
+
+        return response;
+    }
+
+    public Library getLibrary(){
+        Library library = null;
+
         try {
-            input.close();
+            out.writeUTF("library");
+            out.flush();
+            library = (Library) objectIn.readObject();
+        } catch (IOException i) {
+            System.out.println(i);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        return library;
+
+
+    }
+
+    public void close(){
+        try {
+            scanner.close();
+            serverInput.close();
             out.close();
             socket.close();
-        }
-        catch (IOException i) {
+        } catch (IOException i) {
             System.out.println(i);
         }
     }
 
-    public static void main(String args[])
-    {
-//        Scanner input = new Scanner(System.in);
-//        System.out.println("Add file");
-//        String answer = input.next();
-        Client client = new Client("127.0.0.1", 2000);
-
-    }
 }

@@ -28,8 +28,12 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class GUI extends Application {
+    private Lock lock = new ReentrantLock();
+    private ArrayList<Book> booksThatNeedToBeReturned;
     private Stage primaryStage;
     private ObservableList<Book> books = FXCollections.observableArrayList();
 //    private ObservableList<Book> borrowedBooks = FXCollections.observableArrayList();
@@ -116,13 +120,14 @@ public class GUI extends Application {
             }else {
                 String login = userTextField.getText() + "!" + pwBox.getText();
 
-
-                if (client.vaildLogin(login)) {  // Assuming UserManager has this method
-                    currentUser = userTextField.getText();
-                    message.setText("Login Successful. Welcome " + userTextField.getText());
-                    Platform.runLater(this::mainStage);
-                } else {
-                    message.setText("Login Failed. Try again.");
+                synchronized (lock) {
+                    if (client.vaildLogin(login)) {  // Assuming UserManager has this method
+                        currentUser = userTextField.getText();
+                        message.setText("Login Successful. Welcome " + userTextField.getText());
+                        Platform.runLater(this::mainStage);
+                    } else {
+                        message.setText("Login Failed. Try again.");
+                    }
                 }
             }
         });
@@ -171,11 +176,13 @@ public class GUI extends Application {
             }else {
 
                 if (pwBox.getText().equals(pwBox1.getText())) {
-                    if (client.newUser(userTextField.getText() + "!" + pwBox.getText())) {
-                        currentUser = userTextField.getText();
-                        Platform.runLater(this::mainStage);
-                    } else {
-                        message.setText("User Already Exists");
+                    synchronized (lock) {
+                        if (client.newUser(userTextField.getText() + "!" + pwBox.getText())) {
+                            currentUser = userTextField.getText();
+                            Platform.runLater(this::mainStage);
+                        } else {
+                            message.setText("User Already Exists");
+                        }
                     }
 
                 } else {
@@ -190,9 +197,11 @@ public class GUI extends Application {
     }
 
     public void mainStage() {
-        Library library = client.getLibrary();
-        for(Book b: library.library){
-            books.add(b);
+        synchronized (lock) {
+            Library library = client.getLibrary();
+            for (Book b : library.library) {
+                books.add(b);
+            }
         }
 
 
@@ -216,14 +225,16 @@ public class GUI extends Application {
                 borrowButton.setOnAction(event -> {
                     Book book = getTableView().getItems().get(getIndex());
                     if(!borrowed.contains(book)) {
-                        if (client.borrow(book.getTitle(), currentUser)) {
-                            Alert alert = new Alert(Alert.AlertType.INFORMATION, book.getTitle() + " Borrowed!.");
-                            alert.showAndWait();
-                            getTableView().refresh();
-                            borrowed.add(book);
-                        } else {
-                            Alert alert = new Alert(Alert.AlertType.INFORMATION, "No more copies available.");
-                            alert.showAndWait();
+                        synchronized (lock) {
+                            if (client.borrow(book.getTitle(), currentUser)) {
+                                Alert alert = new Alert(Alert.AlertType.INFORMATION, book.getTitle() + " Borrowed!.");
+                                alert.showAndWait();
+                                getTableView().refresh();
+                                borrowed.add(book);
+                            } else {
+                                Alert alert = new Alert(Alert.AlertType.INFORMATION, "No more copies available.");
+                                alert.showAndWait();
+                            }
                         }
                     }else{
                         Alert alert = new Alert(Alert.AlertType.INFORMATION, "You already have this item checked out.");
@@ -323,38 +334,43 @@ public class GUI extends Application {
         VBox dialogVBox = new VBox(20);
         dialogVBox.setAlignment(Pos.CENTER);
 
+        synchronized (lock) {
+            booksThatNeedToBeReturned = client.getBorrowedBooks(currentUser);
 
-        ListView<Book> booksListView = new ListView<>(convertToOB(client.getBorrowedBooks(currentUser)));
+        }
+            ListView<Book> booksListView = new ListView<>(convertToOB(booksThatNeedToBeReturned));
 
-        booksListView.setCellFactory(param -> new ListCell<Book>() {
-            @Override
-            protected void updateItem(Book item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(item.getTitle());
+            booksListView.setCellFactory(param -> new ListCell<Book>() {
+                @Override
+                protected void updateItem(Book item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                    } else {
+                        setText(item.getTitle());
+                    }
                 }
-            }
-        });
+            });
 
-        Button returnButton = new Button("Return Selected");
-        returnButton.setOnAction(e -> {
-            Book selectedBook = booksListView.getSelectionModel().getSelectedItem();
+            Button returnButton = new Button("Return Selected");
+            returnButton.setOnAction(e -> {
+                Book selectedBook = booksListView.getSelectionModel().getSelectedItem();
 
-            if (selectedBook != null) {
-                client.returnBook(selectedBook.getTitle(), currentUser);
-                borrowed.remove(bookFound(selectedBook));
-                booksListView.getItems().remove(selectedBook);
-                booksListView.refresh();
-                dialogStage.close(); // Close the dialog after returning the book.
-            }
-        });
+                if (selectedBook != null) {
+                    synchronized (lock) {
+                        client.returnBook(selectedBook.getTitle(), currentUser);
+                    }
+                    borrowed.remove(bookFound(selectedBook));
+                    booksListView.getItems().remove(selectedBook);
+                    booksListView.refresh();
+                    dialogStage.close(); // Close the dialog after returning the book.
+                }
+            });
+            dialogVBox.getChildren().addAll(new Label("Select a book to return:"), booksListView, returnButton);
+            Scene dialogScene = new Scene(dialogVBox, 300, 400);
+            dialogStage.setScene(dialogScene);
+            dialogStage.showAndWait();
 
-        dialogVBox.getChildren().addAll(new Label("Select a book to return:"), booksListView, returnButton);
-        Scene dialogScene = new Scene(dialogVBox, 300, 400);
-        dialogStage.setScene(dialogScene);
-        dialogStage.showAndWait();
     }
 
 

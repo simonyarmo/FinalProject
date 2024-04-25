@@ -40,13 +40,13 @@ public class Library implements Serializable {
 
     }
 
-    public boolean findBook(String title){
+    public Book findBook(String title){
         for(Book book: library){
             if(book.getTitle().equals(title)){
-                return book.borrow();
+                return book;
             }
         }
-        return false;
+        return null;
     }
 
     private BufferedImage loadImage(String path) {

@@ -1,5 +1,7 @@
 package network;
 import Library.Library;
+import Library.Book;
+import javafx.collections.ObservableList;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -14,6 +16,7 @@ public class Client {
     private DataOutputStream out = null;
     private Scanner scanner = null;
     private ObjectInputStream objectIn;
+    private ObjectOutputStream objectOut;
 
     public Client(String address, int port) {
         try {
@@ -24,6 +27,8 @@ public class Client {
             serverInput = new DataInputStream(socket.getInputStream());
             out = new DataOutputStream(socket.getOutputStream());
             objectIn = new ObjectInputStream(socket.getInputStream());
+            objectOut = new ObjectOutputStream(socket.getOutputStream());
+
         } catch (UnknownHostException u) {
             System.out.println(u);
 
@@ -57,7 +62,7 @@ public class Client {
     }
     public boolean vaildLogin(String user){
         Boolean response =false;
-        user = "login "+user;
+        user = "login!"+user;
 
             try {
                 out.writeUTF(user);
@@ -72,7 +77,7 @@ public class Client {
     }
     public boolean newUser(String create){
         Boolean response =false;
-        create = "create "+create;
+        create = "create!"+create;
 
         try {
             out.writeUTF(create);
@@ -101,19 +106,67 @@ public class Client {
         return library;
     }
 
-    public boolean borrow(String title){
-        boolean borrow =false;
-        title = "borrow "+title;
+    public boolean borrow(String title, String user){
+        Boolean borrow =false;
+        title = "borrow!"+title+"!"+user;
 
         try {
+
             out.writeUTF(title);
             out.flush();
-            borrow = serverInput.readBoolean();
+             borrow = serverInput.readBoolean();
+
 
         } catch (IOException i) {
             System.out.println(i);
         }
         return borrow;
+    }
+    public ArrayList<Book> getBorrowedBooks(String user){
+        ArrayList<Book> borrow = new ArrayList<>();
+        user = "getBorrowed!"+user;
+
+        try {
+
+            out.writeUTF(user);
+            out.flush();
+            Object obj =  objectIn.readObject();
+
+            if (obj instanceof ArrayList<?>) {
+                ArrayList<?> rawList = (ArrayList<?>) obj;
+                if (!rawList.isEmpty() && rawList.get(0) instanceof Book) {
+                     borrow = (ArrayList<Book>) rawList;
+                    // Now you can work with your ArrayList<Book>
+                } else {
+                    borrow =new ArrayList<>();
+
+                }
+            }
+
+        } catch (IOException i) {
+            System.out.println(i);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+
+        return borrow;
+    }
+
+
+    public void returnBook(String book, String user){
+
+        book = "return!"+book +"!"+user;
+
+        try {
+            out.writeUTF(book);
+            out.flush();
+
+        } catch (IOException i) {
+            System.out.println(i);
+        }
+
+
+
     }
 
     public void close(){
@@ -126,6 +179,5 @@ public class Client {
             System.out.println(i);
         }
     }
-
 
 }

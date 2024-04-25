@@ -32,11 +32,13 @@ import java.util.ArrayList;
 public class GUI extends Application {
     private Stage primaryStage;
     private ObservableList<Book> books = FXCollections.observableArrayList();
-    private ObservableList<Book> borrowedBooks = FXCollections.observableArrayList();
+//    private ObservableList<Book> borrowedBooks = FXCollections.observableArrayList();
 
     private TableView<Book> tableView = new TableView<>();
     private ArrayList<BufferedImage> images;
     private Client client;
+    private String currentUser;
+    ArrayList<Book> borrowed =new ArrayList<>();
 
     public GUI() {
         client = new Client("127.0.0.1", 2000);
@@ -77,6 +79,7 @@ public class GUI extends Application {
             }
             Platform.runLater(this::showLoginScreen);
         });
+
         loader.setDaemon(true);
         loader.start();
     }
@@ -111,10 +114,11 @@ public class GUI extends Application {
             if(userTextField.getText().equals("")|| pwBox.getText().equals("")){
                 message.setText("Login Failed. Try again.");
             }else {
-                String login = userTextField.getText() + " " + pwBox.getText();
+                String login = userTextField.getText() + "!" + pwBox.getText();
 
 
                 if (client.vaildLogin(login)) {  // Assuming UserManager has this method
+                    currentUser = userTextField.getText();
                     message.setText("Login Successful. Welcome " + userTextField.getText());
                     Platform.runLater(this::mainStage);
                 } else {
@@ -167,7 +171,8 @@ public class GUI extends Application {
             }else {
 
                 if (pwBox.getText().equals(pwBox1.getText())) {
-                    if (client.newUser(userTextField.getText() + " " + pwBox.getText())) {
+                    if (client.newUser(userTextField.getText() + "!" + pwBox.getText())) {
+                        currentUser = userTextField.getText();
                         Platform.runLater(this::mainStage);
                     } else {
                         message.setText("User Already Exists");
@@ -210,11 +215,18 @@ public class GUI extends Application {
                 layout.getChildren().add(borrowButton);
                 borrowButton.setOnAction(event -> {
                     Book book = getTableView().getItems().get(getIndex());
-                    if (client.borrow(book.getTitle())) {
-
-                        getTableView().refresh();
-                    } else {
-                        Alert alert = new Alert(Alert.AlertType.INFORMATION, "No more copies available.");
+                    if(!borrowed.contains(book)) {
+                        if (client.borrow(book.getTitle(), currentUser)) {
+                            Alert alert = new Alert(Alert.AlertType.INFORMATION, book.getTitle() + " Borrowed!.");
+                            alert.showAndWait();
+                            getTableView().refresh();
+                            borrowed.add(book);
+                        } else {
+                            Alert alert = new Alert(Alert.AlertType.INFORMATION, "No more copies available.");
+                            alert.showAndWait();
+                        }
+                    }else{
+                        Alert alert = new Alert(Alert.AlertType.INFORMATION, "You already have this item checked out.");
                         alert.showAndWait();
                     }
                 });
@@ -310,9 +322,10 @@ public class GUI extends Application {
 
         VBox dialogVBox = new VBox(20);
         dialogVBox.setAlignment(Pos.CENTER);
-        ObservableList<Book> borrowedBooks = FXCollections.observableArrayList(); // This should actually be filled with the books the user has borrowed.
 
-        ListView<Book> booksListView = new ListView<>(borrowedBooks);
+
+        ListView<Book> booksListView = new ListView<>(convertToOB(client.getBorrowedBooks(currentUser)));
+
         booksListView.setCellFactory(param -> new ListCell<Book>() {
             @Override
             protected void updateItem(Book item, boolean empty) {
@@ -328,9 +341,12 @@ public class GUI extends Application {
         Button returnButton = new Button("Return Selected");
         returnButton.setOnAction(e -> {
             Book selectedBook = booksListView.getSelectionModel().getSelectedItem();
+
             if (selectedBook != null) {
-//                selectedBook.returnBook(); // Assume there is a method in Book to handle returning.
+                client.returnBook(selectedBook.getTitle(), currentUser);
+                borrowed.remove(bookFound(selectedBook));
                 booksListView.getItems().remove(selectedBook);
+                booksListView.refresh();
                 dialogStage.close(); // Close the dialog after returning the book.
             }
         });
@@ -341,14 +357,24 @@ public class GUI extends Application {
         dialogStage.showAndWait();
     }
 
-    private void handleBorrow(Book book) {
-        if (book.borrow()) {
-            tableView.refresh();
-            borrowedBooks.add(book);
-        } else {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION, "No more copies available.");
-            alert.showAndWait();
+
+    public ObservableList<Book> convertToOB(ArrayList<Book> books){
+        ObservableList<Book> borrowedBooks = FXCollections.observableArrayList();
+        for(Book x: books){
+            borrowedBooks.add(x);
         }
+        return borrowedBooks;
+    }
+
+    public int bookFound(Book book){
+        int count=0;
+        for(Book b: borrowed){
+            if(b.getTitle().equals(book.getTitle())){
+                return count;
+            }
+            count++;
+        }
+        return -1;
     }
 
     public static void main(String[] args) {

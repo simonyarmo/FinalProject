@@ -7,12 +7,13 @@ import java.util.ArrayList;
 
 public class Library implements Serializable {
     public ArrayList<Book> library;
-    public Library(){
-        library=new ArrayList<>();
+
+    public Library() {
+        library = new ArrayList<>();
 
     }
 
-    public void createLibrary(){
+    public void createLibrary() {
         try {
             // Create a FileReader
             FileReader fileReader = new FileReader("src/Library/libraryDataBase");
@@ -23,11 +24,10 @@ public class Library implements Serializable {
             // Read lines from the file until no more are left
             while ((line = bufferedReader.readLine()) != null) {
                 String[] user = line.split(",");
-                for(int i =0; i<user.length;i++){
+                for (int i = 0; i < user.length; i++) {
                     user[i] = user[i].replaceAll("\"", "");
                 }
-                BufferedImage img = loadImage(user[4]);
-                Book newBook = new Book(user[0], user[1], user[2], Integer.parseInt(user[3]),img);
+                Book newBook = new Book(user[0], user[1], user[2], Integer.parseInt(user[3]),user[4]);
                 library.add(newBook);
             }
 
@@ -39,6 +39,16 @@ public class Library implements Serializable {
 
 
     }
+
+    public boolean findBook(String title){
+        for(Book book: library){
+            if(book.getTitle().equals(title)){
+                return book.borrow();
+            }
+        }
+        return false;
+    }
+
     private BufferedImage loadImage(String path) {
         try {
             // Adjust this if images are stored outside the JAR; use FileInputStream if necessary

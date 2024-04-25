@@ -19,12 +19,15 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import network.Client;
 
+import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 
 public class GUI extends Application {
     private Stage primaryStage;
@@ -32,10 +35,12 @@ public class GUI extends Application {
     private ObservableList<Book> borrowedBooks = FXCollections.observableArrayList();
 
     private TableView<Book> tableView = new TableView<>();
+    private ArrayList<BufferedImage> images;
     private Client client;
 
     public GUI() {
         client = new Client("127.0.0.1", 2000);
+
         // Initialize your UserManager or handle it differently
 
     }
@@ -185,12 +190,13 @@ public class GUI extends Application {
             books.add(b);
         }
 
+
         TableColumn<Book, String> titleColumn = new TableColumn<>("Title");
         titleColumn.setCellValueFactory(new PropertyValueFactory<>("title"));
         TableColumn<Book, String> authorColumn = new TableColumn<>("Author");
         authorColumn.setCellValueFactory(new PropertyValueFactory<>("author"));
-        TableColumn<Book, String> genreColumn = new TableColumn<>("Genre");
-        genreColumn.setCellValueFactory(new PropertyValueFactory<>("genre"));
+        TableColumn<Book, String> genreColumn = new TableColumn<>("Type");
+        genreColumn.setCellValueFactory(new PropertyValueFactory<>("type"));
         TableColumn<Book, Integer> stockColumn = new TableColumn<>("In Stock");
         stockColumn.setCellValueFactory(new PropertyValueFactory<>("stock"));
 
@@ -204,7 +210,8 @@ public class GUI extends Application {
                 layout.getChildren().add(borrowButton);
                 borrowButton.setOnAction(event -> {
                     Book book = getTableView().getItems().get(getIndex());
-                    if (book.borrow()) {
+                    if (client.borrow(book.getTitle())) {
+
                         getTableView().refresh();
                     } else {
                         Alert alert = new Alert(Alert.AlertType.INFORMATION, "No more copies available.");
@@ -224,7 +231,7 @@ public class GUI extends Application {
         tableView.setItems(books);
 
         TextField searchField = new TextField();
-        searchField.setPromptText("Search by Title, Author, or Genre");
+        searchField.setPromptText("Search by Title, Author, or Type");
         Button searchButton = new Button("Search");
         searchButton.setOnAction(e -> searchBooks(searchField.getText()));
 
@@ -247,6 +254,12 @@ public class GUI extends Application {
             });
             return row;
         });
+        Button returnBooksButton = new Button("Return Books");
+        returnBooksButton.setOnAction(e -> showReturnBooksDialog());
+
+        HBox bottomButtons = new HBox(10, logoutButton, returnBooksButton, exitButton);
+        bottomButtons.setAlignment(Pos.CENTER_RIGHT);
+        bottomButtons.setPadding(new Insets(10));
 
         GridPane searchPane = new GridPane();
         searchPane.setHgap(10);
@@ -255,9 +268,6 @@ public class GUI extends Application {
         searchPane.add(searchField, 1, 0);
         searchPane.add(searchButton, 2, 0);
 
-        HBox bottomButtons = new HBox(10, logoutButton, exitButton);
-        bottomButtons.setAlignment(Pos.CENTER_RIGHT);
-        bottomButtons.setPadding(new Insets(10));
 
         VBox layout = new VBox(10, searchPane, tableView, bottomButtons);
         layout.setAlignment(Pos.CENTER);
@@ -284,17 +294,51 @@ public class GUI extends Application {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Book Details");
         alert.setHeaderText(book.getTitle());
-        alert.setContentText("Author: " + book.getAuthor() + "\nGenre: " + book.getGenre());
-
-        if (book.getImage() != null) {
-            Image fxImage = SwingFXUtils.toFXImage(book.getImage(), null);
+        alert.setContentText("Author: " + book.getAuthor() + "\nType: " + book.getGenre());
+        Image fxImage = new Image(book.getImage());
             ImageView imageView = new ImageView(fxImage);
             imageView.setFitWidth(200);
             imageView.setPreserveRatio(true);
             alert.setGraphic(imageView);
-        }
-
         alert.showAndWait();
+    }
+
+    private void showReturnBooksDialog() {
+        Stage dialogStage = new Stage();
+        dialogStage.initModality(Modality.APPLICATION_MODAL);
+        dialogStage.setTitle("Return Books");
+
+        VBox dialogVBox = new VBox(20);
+        dialogVBox.setAlignment(Pos.CENTER);
+        ObservableList<Book> borrowedBooks = FXCollections.observableArrayList(); // This should actually be filled with the books the user has borrowed.
+
+        ListView<Book> booksListView = new ListView<>(borrowedBooks);
+        booksListView.setCellFactory(param -> new ListCell<Book>() {
+            @Override
+            protected void updateItem(Book item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item.getTitle());
+                }
+            }
+        });
+
+        Button returnButton = new Button("Return Selected");
+        returnButton.setOnAction(e -> {
+            Book selectedBook = booksListView.getSelectionModel().getSelectedItem();
+            if (selectedBook != null) {
+//                selectedBook.returnBook(); // Assume there is a method in Book to handle returning.
+                booksListView.getItems().remove(selectedBook);
+                dialogStage.close(); // Close the dialog after returning the book.
+            }
+        });
+
+        dialogVBox.getChildren().addAll(new Label("Select a book to return:"), booksListView, returnButton);
+        Scene dialogScene = new Scene(dialogVBox, 300, 400);
+        dialogStage.setScene(dialogScene);
+        dialogStage.showAndWait();
     }
 
     private void handleBorrow(Book book) {

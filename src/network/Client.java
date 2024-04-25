@@ -1,8 +1,11 @@
 package network;
 import Library.Library;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.*;
+import java.util.ArrayList;
 import java.util.Scanner;
 
 public class Client {
@@ -96,8 +99,21 @@ public class Client {
             throw new RuntimeException(e);
         }
         return library;
+    }
 
+    public boolean borrow(String title){
+        boolean borrow =false;
+        title = "borrow "+title;
 
+        try {
+            out.writeUTF(title);
+            out.flush();
+            borrow = serverInput.readBoolean();
+
+        } catch (IOException i) {
+            System.out.println(i);
+        }
+        return borrow;
     }
 
     public void close(){
@@ -110,5 +126,6 @@ public class Client {
             System.out.println(i);
         }
     }
+
 
 }

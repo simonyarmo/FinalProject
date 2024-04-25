@@ -5,9 +5,12 @@ import User.UserManager;
 import javafx.application.Application;
 import network.Client;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
@@ -20,26 +23,8 @@ public class Main {
         Library lib = new Library();
         Application.launch(GUI.class, args);
 
-
-
-//        Scanner input = new Scanner(System.in);
-//        System.out.println("New Username");
-//        String user = input.next();
-//        while(!user.equals("stop")) {
-//            System.out.println("New Password");
-//            String password = input.next();
-//            if(!manager.contains(user)){
-//                User newUser = new User(user, password);
-//                newUser.addUser();
-//            }
-//            else{
-//                System.out.println("Username already exists. ");
-//            }
-//
-//
-//            System.out.println("New Username");
-//            user = input.next();
-
-//        }
     }
+
+
+
 }

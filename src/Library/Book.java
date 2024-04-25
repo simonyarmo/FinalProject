@@ -1,6 +1,5 @@
 package Library;
 
-import java.awt.image.BufferedImage;
 import java.io.Serializable;
 
 public class Book implements Serializable {
@@ -8,11 +7,11 @@ public class Book implements Serializable {
     private String author;
     private String genre;
 
-    private BufferedImage image;
+    private String image;
 
     public int number;
 
-    public Book(String title, String author, String genre, int number, BufferedImage image) {
+    public Book(String title, String author, String genre, int number,String image) {
         this.title = title;
         this.author = author;
         this.genre = genre;
@@ -53,12 +52,16 @@ public class Book implements Serializable {
     }
     public boolean borrow(){
         if(this.number>0){
+            number--;
             return true;
         }
         else{return false;}
     }
-    public BufferedImage getImage(){
+    public String getImage(){
         return image;
+    }
+    public void returnBook() {
+        this.number++;
     }
 
 }

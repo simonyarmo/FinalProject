@@ -2,8 +2,10 @@ package Gui;
 
 import Library.Book;
 import Library.Library;
+import Library.SoundEffects.Sound;
 import User.User;
 import User.UserManager;
+import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -33,6 +35,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class GUI extends Application {
     private Lock lock = new ReentrantLock();
+    private TextArea messageArea; // Display chat messages
+
     private ArrayList<Book> booksThatNeedToBeReturned;
     private Stage primaryStage;
     private ObservableList<Book> books = FXCollections.observableArrayList();
@@ -42,12 +46,20 @@ public class GUI extends Application {
     private ArrayList<BufferedImage> images;
     private Client client;
     private String currentUser;
+    Sound sound = new Sound();
+    Thread chatThread;
+
     ArrayList<Book> borrowed =new ArrayList<>();
+    ArrayList<String> messageList =new ArrayList<>();
 
-    public GUI() {
+    public GUI() throws IOException {
         client = new Client("127.0.0.1", 2000);
-
-        // Initialize your UserManager or handle it differently
+        chatThread =threading();
+        chatThread.start();
+        sound.setFile(0);
+        sound.play();
+        sound.loop();
+        // Initializes my client, starts my thread that constantly is checking for new messages, and starts the library sound.
 
     }
 
@@ -58,6 +70,13 @@ public class GUI extends Application {
         showLoadingScreen();
     }
 
+    public void platSE(int i){
+        sound.setFile(i);
+        sound.play();
+
+    }
+
+    //A loading screen thought it would be cool.
     private void showLoadingScreen() {
         Label loadingLabel = new Label("Simon's Library");
         loadingLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold;");
@@ -88,6 +107,8 @@ public class GUI extends Application {
         loader.start();
     }
 
+
+    //My Login Screen, prompts you to login.
     public void showLoginScreen() {
         GridPane grid = new GridPane();
         grid.setAlignment(Pos.CENTER);
@@ -116,9 +137,12 @@ public class GUI extends Application {
 
         btnLogin.setOnAction(e -> {
             if(userTextField.getText().equals("")|| pwBox.getText().equals("")){
+                platSE(1);
                 message.setText("Login Failed. Try again.");
             }else {
-                String login = userTextField.getText() + "!" + pwBox.getText();
+                platSE(2);
+                String encryptedPassword = encrypt(userTextField.getText(), pwBox.getText());
+                String login = userTextField.getText() + "!" + encryptedPassword;
 
                 synchronized (lock) {
                     if (client.vaildLogin(login)) {  // Assuming UserManager has this method
@@ -141,6 +165,8 @@ public class GUI extends Application {
         primaryStage.setScene(scene);
     }
 
+
+    //To Create a user. Sends it over to the server to store the data.
     public void createUser() {
         GridPane grid = new GridPane();
         grid.setAlignment(Pos.CENTER);
@@ -172,12 +198,14 @@ public class GUI extends Application {
 
         btnCreate.setOnAction(e -> {
             if(userTextField.getText().equals("")|| pwBox.getText().equals("")|| pwBox1.getText().equals("")){
+                platSE(1);
                 message.setText("Please Make Sure You Fill In All of the Boxes");
             }else {
 
                 if (pwBox.getText().equals(pwBox1.getText())) {
                     synchronized (lock) {
                         if (client.newUser(userTextField.getText() + "!" + pwBox.getText())) {
+                            platSE(2);
                             currentUser = userTextField.getText();
                             Platform.runLater(this::mainStage);
                         } else {
@@ -196,15 +224,17 @@ public class GUI extends Application {
         primaryStage.setScene(scene);
     }
 
+    //This is the main program. Load the library from the server. Anytime you press refresh it reloads this page.
     public void mainStage() {
         synchronized (lock) {
             Library library = client.getLibrary();
+            books.clear();
             for (Book b : library.library) {
                 books.add(b);
             }
         }
 
-
+        tableView = new TableView<>();
         TableColumn<Book, String> titleColumn = new TableColumn<>("Title");
         titleColumn.setCellValueFactory(new PropertyValueFactory<>("title"));
         TableColumn<Book, String> authorColumn = new TableColumn<>("Author");
@@ -212,7 +242,7 @@ public class GUI extends Application {
         TableColumn<Book, String> genreColumn = new TableColumn<>("Type");
         genreColumn.setCellValueFactory(new PropertyValueFactory<>("type"));
         TableColumn<Book, Integer> stockColumn = new TableColumn<>("In Stock");
-        stockColumn.setCellValueFactory(new PropertyValueFactory<>("stock"));
+        stockColumn.setCellValueFactory(new PropertyValueFactory<>("number"));
 
         TableColumn<Book, Void> actionCol = new TableColumn<>("Action");
         actionCol.setCellFactory(col -> new TableCell<Book, Void>() {
@@ -224,7 +254,7 @@ public class GUI extends Application {
                 layout.getChildren().add(borrowButton);
                 borrowButton.setOnAction(event -> {
                     Book book = getTableView().getItems().get(getIndex());
-                    if(!borrowed.contains(book)) {
+                    if(!borrowed.contains(book)&&!client.has(book.getTitle(), currentUser)) {
                         synchronized (lock) {
                             if (client.borrow(book.getTitle(), currentUser)) {
                                 Alert alert = new Alert(Alert.AlertType.INFORMATION, book.getTitle() + " Borrowed!.");
@@ -257,6 +287,10 @@ public class GUI extends Application {
         searchField.setPromptText("Search by Title, Author, or Type");
         Button searchButton = new Button("Search");
         searchButton.setOnAction(e -> searchBooks(searchField.getText()));
+        Button refresh = new Button("Refresh");
+        refresh.setOnAction(e -> refreshLibrary());
+        Button createNewBook = new Button("Add Item!");
+
 
         Button logoutButton = new Button("Logout");
         logoutButton.setOnAction(e -> Platform.runLater(this::showLoginScreen)); // Simple logout action
@@ -277,10 +311,28 @@ public class GUI extends Application {
             });
             return row;
         });
-        Button returnBooksButton = new Button("Return Books");
+        Button returnBooksButton = new Button("Return Item");
         returnBooksButton.setOnAction(e -> showReturnBooksDialog());
+        Button review = new Button("Review an Item");
+        review.setOnAction(e->addReview());
+        returnBooksButton.setOnAction(e -> showReturnBooksDialog());
+        HBox bottomButtons;
 
-        HBox bottomButtons = new HBox(10, logoutButton, returnBooksButton, exitButton);
+        createNewBook.setOnAction(e ->{createNewPage();});
+        Button chatLog = new Button("Chat Log");
+        chatLog.setOnAction(e->{chatLogOpen();});
+
+
+        if(client.isLibrarian(currentUser))
+        {
+             bottomButtons = new HBox(10,chatLog,createNewBook, review,logoutButton, returnBooksButton, exitButton);
+
+        }else{
+            bottomButtons = new HBox(10, review,logoutButton, returnBooksButton, exitButton);
+
+        }
+
+
         bottomButtons.setAlignment(Pos.CENTER_RIGHT);
         bottomButtons.setPadding(new Insets(10));
 
@@ -290,6 +342,7 @@ public class GUI extends Application {
         searchPane.add(new Label("Search:"), 0, 0);
         searchPane.add(searchField, 1, 0);
         searchPane.add(searchButton, 2, 0);
+        searchPane.add(refresh, 4, 0);
 
 
         VBox layout = new VBox(10, searchPane, tableView, bottomButtons);
@@ -301,23 +354,26 @@ public class GUI extends Application {
         primaryStage.show();
     }
 
+
+    //This is the serach method to find what you want.
     private void searchBooks(String query) {
         ObservableList<Book> filtered = FXCollections.observableArrayList();
         for (Book book : books) {
             if (book.getTitle().toLowerCase().contains(query.toLowerCase()) ||
                     book.getAuthor().toLowerCase().contains(query.toLowerCase()) ||
-                    book.getGenre().toLowerCase().contains(query.toLowerCase())) {
+                    book.getType().toLowerCase().contains(query.toLowerCase())) {
                 filtered.add(book);
             }
         }
         tableView.setItems(filtered);
     }
 
+//When you click a book this method is run and it pulls up all of the important information.
     private void showBookDescription(Book book) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Book Details");
         alert.setHeaderText(book.getTitle());
-        alert.setContentText("Author: " + book.getAuthor() + "\nType: " + book.getGenre());
+        alert.setContentText("Author: " + book.getAuthor() + "\nType: " + book.getType()+ "\nDescription: " + book.getDescription()+ "\nPreviously Checked Out : " + book.getPastUsers()+"\n Review: "+book.getReview());
         Image fxImage = new Image(book.getImage());
             ImageView imageView = new ImageView(fxImage);
             imageView.setFitWidth(200);
@@ -326,6 +382,7 @@ public class GUI extends Application {
         alert.showAndWait();
     }
 
+    //Gets the books a user has borrowed and shows it to the user.
     private void showReturnBooksDialog() {
         Stage dialogStage = new Stage();
         dialogStage.initModality(Modality.APPLICATION_MODAL);
@@ -336,6 +393,7 @@ public class GUI extends Application {
 
         synchronized (lock) {
             booksThatNeedToBeReturned = client.getBorrowedBooks(currentUser);
+            borrowed = booksThatNeedToBeReturned;
 
         }
             ListView<Book> booksListView = new ListView<>(convertToOB(booksThatNeedToBeReturned));
@@ -373,7 +431,7 @@ public class GUI extends Application {
 
     }
 
-
+//This is a simple function that just takes an array list and changes it to an ObserableList for JavaFx.
     public ObservableList<Book> convertToOB(ArrayList<Book> books){
         ObservableList<Book> borrowedBooks = FXCollections.observableArrayList();
         for(Book x: books){
@@ -382,6 +440,7 @@ public class GUI extends Application {
         return borrowedBooks;
     }
 
+    //Looks for a book in the borrowed array list.
     public int bookFound(Book book){
         int count=0;
         for(Book b: borrowed){
@@ -393,7 +452,235 @@ public class GUI extends Application {
         return -1;
     }
 
-    public static void main(String[] args) {
-        launch(args);
+    //Refreshes the library by simply re-reunning the main page.
+    public void refreshLibrary(){
+        Platform.runLater(this::mainStage);
     }
+
+    //This encrypts the password by shifting it by the ascii value of the user name. Keeps the characters between a-z.
+    public String encrypt(String username, String password) {
+        int shift = calculateAsciiSum(username) % 26;  // Constrain the shift to the range of 26 letters
+        StringBuilder encryptedMessage = new StringBuilder();
+
+        for (char ch : password.toCharArray()) {
+            if (ch >= 'a' && ch <= 'z') { // Lowercase letters
+                int shiftedValue = ch + shift;
+                if (shiftedValue > 'z') {
+                    shiftedValue = 'a' + (shiftedValue - 'z' - 1); // Wrap around within lowercase letters
+                }
+                encryptedMessage.append((char) shiftedValue);
+            } else if (ch >= 'A' && ch <= 'Z') { // Uppercase letters
+                int shiftedValue = ch + shift;
+                if (shiftedValue > 'Z') {
+                    shiftedValue = 'A' + (shiftedValue - 'Z' - 1); // Wrap around within uppercase letters
+                }
+                encryptedMessage.append((char) shiftedValue);
+            } else {
+                // If it's not a letter, append the character unchanged
+                encryptedMessage.append(ch);
+            }
+        }
+        return encryptedMessage.toString();
+    }
+
+
+//Calculates the Ascii value sum
+    private static int calculateAsciiSum(String keyString) {
+        int sum = 0;
+        for (char ch : keyString.toCharArray()) {
+            sum += ch;
+        }
+        return sum;
+    }
+
+
+    //This creates a new item for the data base
+    public void createNewPage(){
+        Stage dialogStage = new Stage();
+        dialogStage.initModality(Modality.APPLICATION_MODAL);
+        dialogStage.setTitle("Add New Item");
+
+        // VBox for layout
+        VBox dialogVBox = new VBox(10);
+        dialogVBox.setAlignment(Pos.CENTER);
+
+        // TextFields for input
+        TextField authorField = new TextField();
+        authorField.setPromptText("Author of the item");
+        TextField titleField = new TextField();
+        titleField.setPromptText("Title of the item");
+        TextField typeField = new TextField();
+        typeField.setPromptText("Type of the item");
+        TextField stockField = new TextField();
+        stockField.setPromptText("How many in stock");
+        TextArea descriptionArea = new TextArea();
+        descriptionArea.setPromptText("Description of the item");
+
+        // Button to submit the data
+        Button submitButton = new Button("Submit");
+        submitButton.setOnAction(e -> {
+            if(!(titleField.getText().equals("")|| authorField.getText().equals("")|| typeField.getText().equals("")||descriptionArea.getText().equals(""))) {
+                int number = 1;
+                try {
+                    number = Integer.parseInt(stockField.getText());
+                } catch (Exception s) {
+
+                }
+                client.addBook(titleField.getText(), authorField.getText(), typeField.getText(), number, "/bookCovers/noPic.png", descriptionArea.getText());
+                refreshLibrary();
+                platSE(2);
+                dialogStage.close(); // Close the dialog after submission
+            }
+        });
+
+        // Adding all elements to the VBox
+        dialogVBox.getChildren().addAll(new Label("Fill in the details of the item:"),
+                authorField, titleField, typeField, stockField,
+                descriptionArea, submitButton);
+
+        // Setting the scene and showing the stage
+        Scene dialogScene = new Scene(dialogVBox, 400, 500);
+        dialogStage.setScene(dialogScene);
+        dialogStage.showAndWait();
+
+    }
+
+    //This is the chat. It allows librarians to communicate with eachother.
+    public void chatLogOpen() {
+            Stage dialogStage = new Stage();
+            dialogStage.initModality(Modality.APPLICATION_MODAL);
+            dialogStage.setTitle("Chat Log");
+
+            VBox dialogVBox = new VBox(10);
+            dialogVBox.setAlignment(Pos.CENTER);
+
+            messageArea = new TextArea();
+            messageArea.setEditable(false);
+            messageArea.setWrapText(true);
+            messageArea.setPrefHeight(200);
+
+            TextField messageField = new TextField();
+            messageField.setPromptText("Type a message...");
+
+            Button sendButton = new Button("Send");
+            sendButton.setOnAction(e -> {
+                String message = messageField.getText();
+                if (!message.isEmpty()) {
+                    message = currentUser+": "+message;
+                    messageList = sendMessage(message);
+                    displayMessages(messageList); // Display all messages
+                    messageField.setText(""); // Clear the text field
+                }
+            });
+        Button refresh = new Button("Refresh");
+        refresh.setOnAction(e->{
+            try {
+                refreshChat();
+            } catch (IOException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
+
+            dialogVBox.getChildren().addAll(refresh,messageArea, messageField, sendButton);
+
+            Scene dialogScene = new Scene(dialogVBox, 400, 300);
+            dialogStage.setScene(dialogScene);
+            dialogStage.showAndWait();
+    }
+    private void displayMessages(ArrayList<String> m) {
+        Platform.runLater(() -> {
+            try {
+                if (messageArea != null) {
+                    messageArea.clear(); // Clear previous text
+                    for (String msg : m) {
+                        messageArea.appendText(msg + "\n"); // Display each message in a new line
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Error updating message area: " + e.getMessage());
+                Thread.currentThread().interrupt();
+            }
+        });
+
+    }
+
+
+    private ArrayList<String> sendMessage(String message) {
+        return client.sendMessage(message);
+    }
+
+
+    //Adds a review to an item.
+    public void addReview(){
+        Stage dialogStage = new Stage();
+        dialogStage.initModality(Modality.APPLICATION_MODAL);
+        dialogStage.setTitle("Add New Item");
+
+        // VBox for layout
+        VBox dialogVBox = new VBox(10);
+        dialogVBox.setAlignment(Pos.CENTER);
+
+        // TextFields for input
+
+        TextField item = new TextField();
+        item.setPromptText("Item to Review");
+        TextField review = new TextField();
+        review.setPromptText("1-10 stars");
+        TextField typeField = new TextField();
+
+        // Button to submit the data
+        Button submitButton = new Button("Submit");
+        final Label message = new Label();
+        submitButton.setOnAction(e -> {
+
+            try{
+                if(item.getText().equals("")|| review.getText().equals("")||Integer.parseInt(review.getText())>10||Integer.parseInt(review.getText())<0){
+                    message.setText("Invalid Review");
+                }else{
+                    platSE(2);
+                    client.review(item.getText(), review.getText());
+                    refreshLibrary();
+                    dialogStage.close();
+                }
+
+            }
+            catch (Exception s){
+
+            }
+             // Close the dialog after submission
+        });
+
+        // Adding all elements to the VBox
+        dialogVBox.getChildren().addAll(new Label("Review an item:"),
+                item,review, submitButton,message);
+
+        // Setting the scene and showing the stage
+        Scene dialogScene = new Scene(dialogVBox, 400, 500);
+        dialogStage.setScene(dialogScene);
+        dialogStage.showAndWait();
+    }
+
+    //Updates the chat and displays the new messages.
+    public void refreshChat() throws IOException {
+        ArrayList<String> m= client.getMessage();
+        displayMessages(m);
+    }
+//This runs the chat constantly updating it and then displaying the messages.
+    public Thread threading(){
+        Thread b =new Thread(() -> {
+            try {
+                while (!Thread.currentThread().isInterrupted()) {
+                    refreshChat();
+                    Thread.sleep(1000);
+                }
+            } catch (IOException e) {
+                System.out.println("Error reading from chat server: " + e.getMessage());
+            } catch (InterruptedException e) {
+                System.out.println("Thread interrupted");
+                Thread.currentThread().interrupt(); // Properly restore the interrupted status
+            }
+        });
+        return b;
+    }
+
 }

@@ -11,11 +11,14 @@ public class User {
     public String password;
     public String[] borrowedBooks;
 
+    public boolean librarian=false;
+
     public User(String username, String password){
         this.username = username;
         this.password = password;
     }
     public String[] getBorrowed(){return borrowedBooks;}
+    public boolean isLibrarian(){return librarian;}
 
 
 }

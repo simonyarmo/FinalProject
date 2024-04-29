@@ -12,15 +12,22 @@ import java.util.Scanner;
 
 public class Client {
     private Socket socket = null;
+    private Socket messageSocket = null;
     private DataInputStream serverInput = null;
+    private DataInputStream messageIn = null;
+    private BufferedReader in;
+    private BufferedReader chatInput;
     private DataOutputStream out = null;
+    private DataOutputStream messageOut = null;
     private Scanner scanner = null;
     private ObjectInputStream objectIn;
     private ObjectOutputStream objectOut;
 
     public Client(String address, int port) {
         try {
+
             socket = new Socket(address, port);
+
             System.out.println("Connected");
 
             scanner = new Scanner(System.in);
@@ -28,6 +35,8 @@ public class Client {
             out = new DataOutputStream(socket.getOutputStream());
             objectIn = new ObjectInputStream(socket.getInputStream());
             objectOut = new ObjectOutputStream(socket.getOutputStream());
+
+
 
         } catch (UnknownHostException u) {
             System.out.println(u);
@@ -37,28 +46,6 @@ public class Client {
 
         }
 
-//        String line = "";
-//        while (!line.equals("Over")) {
-//            try {
-//                line = scanner.nextLine();
-//                out.writeUTF(line);
-//                out.flush();
-//                Boolean response = serverInput.readBoolean();
-//                System.out.println(response);
-//            } catch (IOException i) {
-//                System.out.println(i);
-//                break;
-//            }
-//        }
-//
-//        try {
-//            scanner.close();
-//            serverInput.close();
-//            out.close();
-//            socket.close();
-//        } catch (IOException i) {
-//            System.out.println(i);
-//        }
     }
     public boolean vaildLogin(String user){
         Boolean response =false;
@@ -81,6 +68,21 @@ public class Client {
 
         try {
             out.writeUTF(create);
+            out.flush();
+            response = serverInput.readBoolean();
+        } catch (IOException i) {
+            System.out.println(i);
+        }
+
+
+        return response;
+    }
+    public boolean has(String title,String user){
+        Boolean response =false;
+        title = "has!"+title+"!"+user;
+
+        try {
+            out.writeUTF(title);
             out.flush();
             response = serverInput.readBoolean();
         } catch (IOException i) {
@@ -164,9 +166,97 @@ public class Client {
         } catch (IOException i) {
             System.out.println(i);
         }
+    }
+    public boolean isLibrarian(String user){
+        boolean lib =false;
+        user = "librarian!"+user;
+
+        try {
+            out.writeUTF(user);
+            out.flush();
+            lib = serverInput.readBoolean();
+
+        } catch (IOException i) {
+            System.out.println(i);
+        }
+        return lib;
+    }
+    public void addBook(String title, String author, String type, int number, String image, String description){
+        String book = "Book!"+title+"!"+author+"!"+type+"!"+number+"!"+image+"!"+description;
+        try {
+            out.writeUTF(book);
+            out.flush();
+        } catch (IOException i) {
+            System.out.println(i);
+        }
+    }
+
+    public void review(String book, String review){
+        String line = "review!"+book+"!"+review;
+        try {
+            out.writeUTF(line);
+            out.flush();
+        } catch (IOException i) {
+            System.out.println(i);
+        }
+
+    }
+    public ArrayList<String> getMessage() throws IOException {
+        ArrayList<String> messages = new ArrayList<>();
+        try {
+            out.writeUTF("getChat");
+            out.flush();
+
+            Object obj =  objectIn.readObject();
+
+            if (obj instanceof ArrayList<?>) {
+                ArrayList<?> rawList = (ArrayList<?>) obj;
+                if (!rawList.isEmpty() && rawList.get(0) instanceof String) {
+                    messages = (ArrayList<String>) rawList;
+                    // Now you can work with your ArrayList<Book>
+                } else {
+                    messages =new ArrayList<>();
+
+                }
+            }
 
 
+        } catch (IOException i) {
+            System.out.println(i);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        return messages;
+    }
 
+    public ArrayList<String> sendMessage(String message){
+        ArrayList<String> messages = new ArrayList<>();
+        message = "Chat!"+message;
+
+        try {
+            out.writeUTF(message);
+            out.flush();
+
+            Object obj =  objectIn.readObject();
+
+            if (obj instanceof ArrayList<?>) {
+                ArrayList<?> rawList = (ArrayList<?>) obj;
+                if (!rawList.isEmpty() && rawList.get(0) instanceof String) {
+                    messages = (ArrayList<String>) rawList;
+                    // Now you can work with your ArrayList<Book>
+                } else {
+                    messages =new ArrayList<>();
+
+                }
+            }
+
+
+        } catch (IOException i) {
+            System.out.println(i);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        return messages;
     }
 
     public void close(){

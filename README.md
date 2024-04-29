@@ -61,10 +61,10 @@ Adding a book:			Returning a book:
 Once you are done you can either logout and log into another account or simply quit the application. 
 
 **Running the Program**
-To run the program you first need to download the ServerJar.zip. This file contains a jar file and then corresponding classes. You can run the jar file by double clicking it or in your terminal with the command **java -jar ServerFinal\ Project.jar**
+To run the program you first need to download the FinalProject Server JAR sy2267.zip. This file contains a jar file and then corresponding classes. You can run the jar file by double clicking it or in your terminal with the command **java -jar ServerFinal\ Project.jar**
 This file should start and then look for a client to connect. If you recieve an error such as port busy you need to change the port of the Server in the ServerDriver.java file. 
 
-Next download the FinalProject.zip. This file contains the jar file and the corresponding classes. You can run the jar file by double clicking on it or in the terminal. 
+Next download the FinalProject Client JAR sy2267.zip. This file contains the jar file and the corresponding classes. You can run the jar file by double clicking on it or in the terminal. 
 **java -jar FinalProject.jar** 
 Since I used JavaFX to build the GUI you must be running java 8. Most machines are running the most updated version. You may need to go download the required SDK to be able to run the program. If you changed the port in the Server file you must change the port in the client file. The port is located in the Gui constructor in the GUI class. 
 
